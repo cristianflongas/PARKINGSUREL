@@ -39,20 +39,22 @@ class LoginRequest extends FormRequest
      * @throws ValidationException
      */
     public function authenticate(): void
-{
-    $this->ensureIsNotRateLimited();
+    {
+        $this->ensureIsNotRateLimited();
 
-    // Cambia 'password_hash' por 'password'
-    if (! Auth::attempt($this->only('usuario', 'password'), $this->boolean('remember'))) {
-        RateLimiter::hit($this->throttleKey());
+        // Laravel usa el campo 'password' en el request, pero el modelo Personal
+        // usa 'password_hash' en la base de datos. El método getAuthPassword()
+        // en el modelo Personal maneja esta conversión automáticamente.
+        if (! Auth::attempt($this->only('usuario', 'password'), $this->boolean('remember'))) {
+            RateLimiter::hit($this->throttleKey());
 
-        throw ValidationException::withMessages([
-            'usuario' => __('auth.failed'),
-        ]);
+            throw ValidationException::withMessages([
+                'usuario' => __('auth.failed'),
+            ]);
+        }
+
+        RateLimiter::clear($this->throttleKey());
     }
-
-    RateLimiter::clear($this->throttleKey());
-}
 
     /**
      * Ensure the login request is not rate limited.

@@ -23,15 +23,28 @@ class Personal extends Authenticatable
         'password_hash',
     ];
 
+    protected $casts = [
+        'password_hash' => 'hashed',
+    ];
+
+    /**
+     * Get the password for the user.
+     * Laravel usa este método para saber qué campo contiene la contraseña hasheada
+     */
+    public function getAuthPassword(): string
+    {
+        return $this->password_hash;
+    }
+
     // Relación con el usuario (por si necesitas traer su nombre o correo)
     public function user()
     {
         return $this->belongsTo(User::class, 'cedula_users', 'cedula');
     }
 
-    // Le indicamos a Laravel que tu columna de contraseña se llama 'password_hash'
-    public function getAuthPassword()
+    // Relación con Rol
+    public function rol()
     {
-        return $this->password_hash;
+        return $this->belongsTo(Rol::class, 'id_rol', 'id_rol');
     }
 }

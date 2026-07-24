@@ -10,12 +10,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    protected $primaryKey = 'cedula';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
+    protected $fillable = [
+        'cedula',
+        'nombre',
+        'telefono',
+        'correo',
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -25,8 +34,27 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
+    }
+
+    // Relación con Personal
+    public function personal()
+    {
+        return $this->hasOne(Personal::class, 'cedula_users', 'cedula');
+    }
+
+    // Relación con Rol a través de Personal
+    public function rol()
+    {
+        return $this->hasOneThrough(
+            Rol::class,
+            Personal::class,
+            'cedula_users',
+            'id_rol',
+            'cedula',
+            'id_rol'
+        );
     }
 }
