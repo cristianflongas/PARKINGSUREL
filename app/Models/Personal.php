@@ -9,6 +9,8 @@ class Personal extends Authenticatable
 {
     use Notifiable;
 
+    // Este modelo representa al personal del parqueadero.
+    // Se registra desde el módulo de Usuarios y es quien autentica al sistema.
     protected $table = 'personal';
     protected $primaryKey = 'id_personal';
 

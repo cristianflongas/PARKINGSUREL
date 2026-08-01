@@ -57,37 +57,46 @@ class VehiculoController extends Controller
     {
         $request->validate([
             'placa' => 'required|string|max:8|unique:vehiculo,placa',
+            'cedula' => 'required|string|max:20|unique:users,cedula',
             'propietario' => 'required|string|max:100',
+            'telefono' => 'nullable|string|max:20',
+            'correo' => 'nullable|email|max:100|unique:users,correo',
             'marca_modelo' => 'required|string|max:100',
             'tipo' => 'nullable|string|max:30',
         ]);
 
         $placa = strtoupper(trim($request->placa));
+        $cedula = strtoupper(trim($request->cedula));
+        $correo = trim((string) $request->correo ?: $cedula . '@parkingsure.com');
 
-        DB::transaction(function () use ($request, $placa) {
-            // Obtener o crear Cliente
-            $user = User::firstOrCreate(
-                ['email' => strtolower(str_replace(' ', '', $request->propietario)) . '@parkingsure.com'],
+        DB::transaction(function () use ($request, $placa, $cedula, $correo) {
+            $user = User::updateOrCreate(
+                ['cedula' => $cedula],
                 [
-                    'name' => $request->propietario,
-                    'cedula' => rand(1000000000, 9999999999),
-                    'password' => Hash::make('password'),
+                    'cedula' => $cedula,
+                    'nombre' => trim($request->propietario),
+                    'telefono' => trim((string) $request->telefono),
+                    'correo' => $correo,
                 ]
             );
 
             $cliente = Cliente::firstOrCreate(['cedula_users' => $user->cedula]);
 
-            $parts = explode(' ', $request->marca_modelo);
-            $marca = $parts[0] ?? 'Generico';
-            $modelo = isset($parts[1]) ? implode(' ', array_slice($parts, 1)) : 'Estandar';
+            $marcaModelo = trim((string) $request->marca_modelo);
+            $partes = preg_split('/\s+/', $marcaModelo, 2);
+            $marca = $partes[0] ?? 'Generico';
+            $modelo = count($partes) > 1 ? $partes[1] : 'Estandar';
 
-            Vehiculo::create([
-                'placa' => $placa,
-                'id_cliente' => $cliente->id_cliente,
-                'marca' => $marca,
-                'modelo' => $modelo,
-                'color' => $request->tipo ?? 'Estandar',
-            ]);
+            Vehiculo::updateOrCreate(
+                ['placa' => $placa],
+                [
+                    'placa' => $placa,
+                    'id_cliente' => $cliente->id_cliente,
+                    'marca' => $marca,
+                    'modelo' => $modelo,
+                    'color' => $request->tipo ?? 'Estandar',
+                ]
+            );
         });
 
         return redirect()->route('vehiculos')->with('success', "Vehículo {$placa} registrado exitosamente.");
@@ -100,6 +109,9 @@ class VehiculoController extends Controller
             'marca' => 'required|string|max:30',
             'modelo' => 'required|string|max:30',
             'color' => 'nullable|string|max:20',
+            'cedula' => 'nullable|string|max:20',
+            'telefono' => 'nullable|string|max:20',
+            'correo' => 'nullable|email|max:100',
         ]);
 
         $vehiculo = Vehiculo::findOrFail($placa);
@@ -112,7 +124,17 @@ class VehiculoController extends Controller
             ]);
 
             if ($vehiculo->cliente && $vehiculo->cliente->user) {
-                $vehiculo->cliente->user->update(['name' => $request->propietario]);
+                $user = $vehiculo->cliente->user;
+                $user->update([
+                    'nombre' => $request->propietario,
+                    'telefono' => $request->telefono ?? $user->telefono,
+                    'correo' => $request->correo ?? $user->correo,
+                ]);
+
+                if ($request->filled('cedula') && $request->cedula !== $user->cedula) {
+                    $user->cedula = $request->cedula;
+                    $user->save();
+                }
             }
         });
 

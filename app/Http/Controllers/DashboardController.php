@@ -11,7 +11,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        // 1. Plazas Disponibles
+        // 1. Módulos Disponibles
         $disponibles = Modulo::where('estado', 'DISPONIBLE')->count();
 
         // 2. Vehículos Estacionados Activos

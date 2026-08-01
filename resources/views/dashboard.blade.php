@@ -13,7 +13,7 @@
             <div class="kpi-card">
                 <div class="kpi-icon"><i class="fas fa-parking"></i></div>
                 <div class="kpi-value">{{ $disponibles }}</div>
-                <div class="kpi-label">Plazas Disponibles</div>
+                <div class="kpi-label">Módulos Disponibles</div>
             </div>
         </div>
 

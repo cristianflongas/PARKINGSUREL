@@ -20,10 +20,17 @@ Route::middleware('auth')->group(function () {
     // Dashboard Principal - Dinámico
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Parqueadero & Operación de Módulos (Entradas y Salidas en Tiempo Real)
+    // Parqueadero — Vista unificada con módulos, entradas y salidas
     Route::get('/parqueadero', [ParqueaderoController::class, 'index'])->name('parqueadero');
     Route::post('/parqueadero/entrada', [ParqueaderoController::class, 'registrarEntrada'])->name('parqueadero.entrada');
     Route::post('/parqueadero/salida', [ParqueaderoController::class, 'registrarSalida'])->name('parqueadero.salida');
+    Route::post('/parqueadero/ocr', [ParqueaderoController::class, 'procesarFotoOCR'])->name('parqueadero.ocr');
+
+    // CRUD de Módulos (integrado en la vista Parqueadero)
+    Route::post('/parqueadero/modulos', [ParqueaderoController::class, 'storeModulo'])->name('parqueadero.modulos.store');
+    Route::put('/parqueadero/modulos/{id}', [ParqueaderoController::class, 'updateModulo'])->name('parqueadero.modulos.update');
+    Route::delete('/parqueadero/modulos/{id}', [ParqueaderoController::class, 'destroyModulo'])->name('parqueadero.modulos.destroy');
+    Route::post('/parqueadero/modulos/{id}/estado', [ParqueaderoController::class, 'cambiarEstadoModulo'])->name('parqueadero.modulos.estado');
 
     // Gestión de Vehículos y Propietarios
     Route::get('/vehiculos', [VehiculoController::class, 'index'])->name('vehiculos');

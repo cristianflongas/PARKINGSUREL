@@ -19,8 +19,8 @@
         <div style="display:flex;flex-direction:column;min-height:100vh;">
             <header style="width:100%;max-width:1240px;margin:0 auto;padding:1.45rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
                 <a href="{{ url('/') }}" style="display:inline-flex;align-items:center;gap:0.9rem;font-weight:800;font-size:1.45rem;letter-spacing:-0.04em;color:inherit;text-decoration:none;">
-                    <span style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;background:#f7c600;color:#111;font-weight:900;font-size:1.2rem;box-shadow:0 14px 30px rgba(247,198,0,0.2);">P</span>
-                    PARKING<span style="color:#4b5563;font-weight:600;">SURE</span>
+                    <div style="width:36px;height:36px;background:#ffd700;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:#0a0a0a;">P</div>
+        <div style="font-size:22px;font-weight:900;letter-spacing:-0.5px;color:#0a0a0a;">PARKING<em style="font-style:normal;font-weight:500;color:#737373;">SURE</em></div>
                 </a>
                 <div style="display:flex;flex-wrap:wrap;gap:0.9rem;align-items:center;">
                     @if (Route::has('login'))

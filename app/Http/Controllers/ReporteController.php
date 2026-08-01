@@ -332,11 +332,13 @@ class ReporteController extends Controller
         }
         
         $csv .= "\nDatos de Gráfica:\n";
-        $csv .= "Labels: " . implode(', ', $datosGrafica['labels']) . "\n";
-        $csv .= "Data: " . implode(', ', $datosGrafica['data']) . "\n";
+        // Usamos ->implode() directamente sobre la colección de Laravel
+        $csv .= "Labels: " . $datosGrafica['labels']->implode(', ') . "\n";
+        $csv .= "Data: " . $datosGrafica['data']->implode(', ') . "\n";
 
         return response($csv)
             ->header('Content-Type', 'text/csv')
             ->header('Content-Disposition', 'attachment; filename="reporte_' . $tipoReporte . '_' . $fechaInicio . '_' . $fechaFin . '.csv"');
     }
+    
 }

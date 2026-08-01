@@ -11,6 +11,7 @@ use App\Models\Salida;
 use App\Models\TipoServicio;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Services\PlacaOCRService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,80 +19,166 @@ use Illuminate\Support\Facades\Hash;
 
 class ParqueaderoController extends Controller
 {
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Vista principal unificada: mapa de módulos + CRUD de módulos
+    // ─────────────────────────────────────────────────────────────────────────
     public function index()
     {
-        // 1. Inicialización automática de módulos si la tabla está vacía
-        if (Modulo::count() === 0) {
-            $niveles = ['A', 'B', 'C'];
-            foreach ($niveles as $nivel) {
-                for ($i = 1; $i <= 20; $i++) {
-                    $codigo = $nivel . '-' . str_pad($i, 2, '0', STR_PAD_LEFT);
-                    Modulo::create([
-                        'ubicacion' => $codigo,
-                        'estado' => ($i % 7 == 0) ? 'MANTENIMIENTO' : 'DISPONIBLE',
-                    ]);
-                }
-            }
-        }
-
-        // 2. Inicialización de tipos de servicio por defecto si está vacía
+        // Inicialización de tipos de servicio por defecto
         if (TipoServicio::count() === 0) {
-            TipoServicio::create(['nombre_tipo_servicio' => 'Tarifa Auto / Hora', 'tarifa' => 2.00, 'estado' => 'ACTIVO']);
-            TipoServicio::create(['nombre_tipo_servicio' => 'Tarifa Moto / Hora', 'tarifa' => 1.00, 'estado' => 'ACTIVO']);
+            TipoServicio::create(['nombre_tipo_servicio' => 'Tarifa Auto / Hora',      'tarifa' => 2.00, 'estado' => 'ACTIVO']);
+            TipoServicio::create(['nombre_tipo_servicio' => 'Tarifa Moto / Hora',      'tarifa' => 1.00, 'estado' => 'ACTIVO']);
             TipoServicio::create(['nombre_tipo_servicio' => 'Tarifa Camioneta / Hora', 'tarifa' => 2.50, 'estado' => 'ACTIVO']);
         }
 
-        // 3. Estadísticas generales de Módulos
-        $totalDisponibles = Modulo::where('estado', 'DISPONIBLE')->count();
-        $totalOcupados = Modulo::where('estado', 'OCUPADO')->count();
-        $totalMantenimiento = Modulo::where('estado', 'MANTENIMIENTO')->count();
+        // Todos los módulos ordenados por ubicación
+        $modulos = Modulo::orderBy('ubicacion')->get();
 
-        // 4. Ocupación por Niveles de Módulos
-        $nivelA_Ocupados = Modulo::where('ubicacion', 'LIKE', 'A-%')->where('estado', 'OCUPADO')->count();
-        $nivelB_Ocupados = Modulo::where('ubicacion', 'LIKE', 'B-%')->where('estado', 'OCUPADO')->count();
-        $nivelC_Ocupados = Modulo::where('ubicacion', 'LIKE', 'C-%')->where('estado', 'OCUPADO')->count();
+        // Estadísticas
+        $disponibles   = $modulos->where('estado', 'DISPONIBLE')->count();
+        $ocupados      = $modulos->where('estado', 'OCUPADO')->count();
+        $mantenimiento = $modulos->where('estado', 'MANTENIMIENTO')->count();
 
-        // 5. Carga de Módulos del Nivel A (principal) para el mapa interactivo
-        $modulosNivelA = Modulo::where('ubicacion', 'LIKE', 'A-%')->orderBy('id_modulo')->get();
-
-        // 6. Módulos disponibles y tipos de servicios para el modal de Entrada
-        $modulosLibres = Modulo::where('estado', 'DISPONIBLE')->orderBy('ubicacion')->get();
-        $tiposServicio = TipoServicio::where('estado', 'ACTIVO')->get();
-
-        // 7. Entradas activas asociadas a cada módulo ocupado
+        // Entradas activas indexadas por id_modulo
         $entradasActivas = Entrada::with(['vehiculo.cliente.user', 'modulo', 'tipoServicio'])
             ->where('estado', 'ACTIVO')
             ->get()
             ->keyBy('id_modulo');
 
+        // Módulos libres y tipos de servicio para el modal de entrada
+        $modulosLibres = $modulos->where('estado', 'DISPONIBLE')->values();
+        $tiposServicio = TipoServicio::where('estado', 'ACTIVO')->get();
+
+        // Vehículos registrados con datos del propietario (para select manual)
+        $vehiculosRegistrados = Vehiculo::with(['cliente.user'])
+            ->orderBy('placa')
+            ->get()
+            ->map(function ($v) {
+                return [
+                    'placa'       => $v->placa,
+                    'marca'       => $v->marca ?? '',
+                    'modelo'      => $v->modelo ?? '',
+                    'cedula'      => $v->cliente->user->cedula ?? '',
+                    'propietario' => $v->cliente->user->nombre ?? 'Cliente General',
+                ];
+            });
+
         return view('parqueadero', [
-            'active' => 'parqueadero',
-            'disponibles' => $totalDisponibles,
-            'ocupados' => $totalOcupados,
-            'mantenimiento' => $totalMantenimiento,
-            'nivelA_Ocupados' => $nivelA_Ocupados,
-            'nivelB_Ocupados' => $nivelB_Ocupados,
-            'nivelC_Ocupados' => $nivelC_Ocupados,
-            'modulosNivelA' => $modulosNivelA,
-            'modulosLibres' => $modulosLibres,
-            'tiposServicio' => $tiposServicio,
-            'entradasActivas' => $entradasActivas,
+            'active'               => 'parqueadero',
+            'modulos'              => $modulos,
+            'disponibles'          => $disponibles,
+            'ocupados'             => $ocupados,
+            'mantenimiento'        => $mantenimiento,
+            'entradasActivas'      => $entradasActivas,
+            'modulosLibres'        => $modulosLibres,
+            'tiposServicio'        => $tiposServicio,
+            'vehiculosRegistrados' => $vehiculosRegistrados,
         ]);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  CRUD de Módulos (integrado en la misma vista)
+    // ─────────────────────────────────────────────────────────────────────────
+    public function storeModulo(Request $request)
+    {
+        $request->validate([
+            'ubicacion' => 'required|string|max:20|unique:modulo,ubicacion',
+            'estado'    => 'required|in:DISPONIBLE,OCUPADO,MANTENIMIENTO',
+        ]);
+
+        Modulo::create([
+            'ubicacion' => strtoupper(trim($request->ubicacion)),
+            'estado'    => $request->estado,
+        ]);
+
+        return redirect()->route('parqueadero')->with('success', 'Módulo creado exitosamente.');
+    }
+
+    public function updateModulo(Request $request, $id)
+    {
+        $request->validate([
+            'ubicacion' => 'required|string|max:20|unique:modulo,ubicacion,' . $id . ',id_modulo',
+            'estado'    => 'required|in:DISPONIBLE,MANTENIMIENTO',
+        ]);
+
+        $modulo = Modulo::findOrFail($id);
+
+        // No se puede editar un módulo con vehículo activo
+        if ($modulo->estado === 'OCUPADO') {
+            $entradaActiva = $modulo->entradas()->where('estado', 'ACTIVO')->first();
+            if ($entradaActiva) {
+                return redirect()->back()->withErrors(['error' => 'No se puede modificar el módulo porque tiene un vehículo estacionado actualmente.']);
+            }
+        }
+
+        $modulo->update([
+            'ubicacion' => strtoupper(trim($request->ubicacion)),
+            'estado'    => $request->estado,
+        ]);
+
+        return redirect()->route('parqueadero')->with('success', 'Módulo actualizado exitosamente.');
+    }
+
+    public function destroyModulo($id)
+    {
+        $modulo = Modulo::findOrFail($id);
+
+        if ($modulo->entradas()->where('estado', 'ACTIVO')->exists()) {
+            return redirect()->back()->withErrors(['error' => 'No se puede eliminar el módulo porque tiene un vehículo estacionado actualmente.']);
+        }
+
+        $modulo->delete();
+
+        return redirect()->route('parqueadero')->with('success', 'Módulo eliminado exitosamente.');
+    }
+
+    public function cambiarEstadoModulo(Request $request, $id)
+    {
+        $request->validate([
+            'estado' => 'required|in:DISPONIBLE,MANTENIMIENTO',
+        ]);
+
+        $modulo = Modulo::findOrFail($id);
+
+        if ($modulo->estado === 'OCUPADO') {
+            return response()->json([
+                'success' => false,
+                'message' => 'El módulo está ocupado. El estado se libera automáticamente al registrar la salida del vehículo.'
+            ], 400);
+        }
+
+        $modulo->update(['estado' => $request->estado]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Estado del módulo actualizado exitosamente.',
+            'estado'  => $modulo->estado,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Operaciones de Entrada y Salida
+    // ─────────────────────────────────────────────────────────────────────────
     public function registrarEntrada(Request $request)
     {
         $request->validate([
-            'placa' => 'required|string|max:8',
-            'id_modulo' => 'required|exists:modulo,id_modulo',
+            'placa'            => 'required|string|max:8',
+            'cedula'           => 'nullable|string|max:20',
+            'id_modulo'        => 'required|exists:modulo,id_modulo',
             'id_tipo_servicio' => 'required|exists:tipo_servicio,id_tipo_servicio',
-            'propietario' => 'nullable|string|max:100',
-            'marca_modelo' => 'nullable|string|max:100',
-            'foto_base64' => 'nullable|string',
-            'foto_archivo' => 'nullable|image|max:5120',
+            'propietario'      => 'nullable|string|max:100',
+            'marca_modelo'     => 'nullable|string|max:100',
+            'foto_base64'      => 'nullable|string',
+            'foto_archivo'     => 'nullable|image|max:5120',
         ]);
 
         $placa = strtoupper(trim($request->placa));
+
+        // Verificar si el módulo está disponible
+        $modulo = Modulo::findOrFail($request->id_modulo);
+        if ($modulo->estado !== 'DISPONIBLE') {
+            return redirect()->back()->withErrors(['error' => "El módulo {$modulo->ubicacion} no está disponible para registrar entradas."]);
+        }
 
         // Verificar si el vehículo ya tiene un ingreso activo
         $ingresoExistente = Entrada::where('placa', $placa)->where('estado', 'ACTIVO')->first();
@@ -99,98 +186,87 @@ class ParqueaderoController extends Controller
             return redirect()->back()->withErrors(['placa' => "El vehículo con placa {$placa} ya registra un ingreso activo en el Módulo {$ingresoExistente->modulo->ubicacion}."]);
         }
 
-        // Procesar Captura de Foto de Entrada
-        $fotoEntradaPath = null;
-        if ($request->filled('foto_base64')) {
-            try {
-                $imgData = $request->foto_base64;
-                $imgData = str_replace('data:image/jpeg;base64,', '', $imgData);
-                $imgData = str_replace('data:image/png;base64,', '', $imgData);
-                $imgData = str_replace(' ', '+', $imgData);
-                $data = base64_decode($imgData);
-
-                $filename = 'entrada_' . preg_replace('/[^A-Za-z0-9]/', '', $placa) . '_' . time() . '.jpg';
-                $directory = public_path('uploads/entradas');
-                if (!file_exists($directory)) {
-                    mkdir($directory, 0755, true);
-                }
-                file_put_contents($directory . '/' . $filename, $data);
-                $fotoEntradaPath = 'uploads/entradas/' . $filename;
-            } catch (\Exception $e) {
-                // Si falla la conversión de base64, continuar sin detener la transacción
-                $fotoEntradaPath = null;
-            }
-        } elseif ($request->hasFile('foto_archivo')) {
-            $file = $request->file('foto_archivo');
-            $filename = 'entrada_' . preg_replace('/[^A-Za-z0-9]/', '', $placa) . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $directory = public_path('uploads/entradas');
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
-            }
-            $file->move($directory, $filename);
-            $fotoEntradaPath = 'uploads/entradas/' . $filename;
+        $vehiculoExistente = Vehiculo::with(['cliente.user'])->where('placa', $placa)->first();
+        if ($vehiculoExistente) {
+            $request->merge([
+                'cedula' => $vehiculoExistente->cliente?->user?->cedula ?? $request->cedula,
+                'propietario' => $vehiculoExistente->cliente?->user?->nombre ?? $request->propietario ?? 'Cliente General',
+                'marca_modelo' => trim(($vehiculoExistente->marca ?? '') . ' ' . ($vehiculoExistente->modelo ?? '')) ?: ($request->marca_modelo ?? 'Generico Estandar'),
+            ]);
         }
 
+        // Procesar foto de entrada
+        $fotoEntradaPath = $this->procesarFoto($request, 'foto_base64', 'foto_archivo', 'entradas', $placa);
+
         DB::transaction(function () use ($request, $placa, $fotoEntradaPath) {
-            // 1. Obtener o crear Cliente por defecto si no existe
             $userAuth = auth()->user();
-            $cliente = Cliente::first();
+
+            $cliente = null;
+            if ($request->filled('cedula')) {
+                $userCliente = User::updateOrCreate(
+                    ['cedula' => strtoupper(trim($request->cedula))],
+                    [
+                        'cedula' => strtoupper(trim($request->cedula)),
+                        'nombre' => trim((string) ($request->propietario ?? 'Cliente General')),
+                        'telefono' => trim((string) ($request->telefono ?? '')) ?: null,
+                        'correo' => trim((string) ($request->correo ?? '')) ?: strtolower(trim((string) ($request->cedula))) . '@parkingsure.com',
+                    ]
+                );
+
+                $cliente = Cliente::firstOrCreate(['cedula_users' => $userCliente->cedula]);
+            } else {
+                $cliente = Cliente::first();
+            }
+
             if (!$cliente) {
-                // La tabla users usa 'correo' y 'nombre' (no email/name)
                 $user = User::firstOrCreate(
                     ['correo' => 'cliente.general@parkingsure.com'],
-                    [
-                        'cedula' => '9999999999',
-                        'nombre' => 'Cliente General',
-                        'telefono' => '0000000000',
-                    ]
+                    ['cedula' => '9999999999', 'nombre' => 'Cliente General', 'telefono' => '0000000000']
                 );
                 $cliente = Cliente::create(['cedula_users' => $user->cedula]);
             }
 
-            // 2. Obtener o crear el Vehículo
-            $vehiculo = Vehiculo::find($placa);
+            $vehiculo = Vehiculo::where('placa', $placa)->first();
             if (!$vehiculo) {
-                $parts = explode(' ', $request->marca_modelo ?? 'Generico Estandar');
-                $marca = $parts[0] ?? 'Generico';
-                $modelo = isset($parts[1]) ? implode(' ', array_slice($parts, 1)) : 'Estandar';
+                $marcaModelo = trim((string) ($request->marca_modelo ?? 'Generico Estandar'));
+                $partes = preg_split('/\s+/', $marcaModelo, 2);
+                $marca = $partes[0] ?? 'Generico';
+                $modelo = count($partes) > 1 ? $partes[1] : 'Estandar';
 
                 $vehiculo = Vehiculo::create([
-                    'placa' => $placa,
+                    'placa'      => $placa,
                     'id_cliente' => $cliente->id_cliente,
-                    'marca' => $marca,
-                    'modelo' => $modelo,
+                    'marca'      => $marca,
+                    'modelo'     => $modelo,
+                    'color'      => $request->tipo ?? 'Estandar',
                 ]);
             }
 
-            // 3. Obtener el id_personal del operador actual
-            $personal = Personal::where('cedula', $userAuth->cedula)->first();
+            $idBuscado = $userAuth->id_personal ?? $userAuth->cedula ?? $userAuth->id;
+            $personal  = Personal::find($idBuscado);
             $idPersonal = $personal ? $personal->id_personal : 1;
 
-            // 4. Registrar Entrada con foto_entrada
             Entrada::create([
-                'placa' => $placa,
-                'id_modulo' => $request->id_modulo,
-                'id_personal' => $idPersonal,
-                'id_tipo_servicio' => $request->id_tipo_servicio,
+                'placa'              => $placa,
+                'id_modulo'          => $request->id_modulo,
+                'id_personal'        => $idPersonal,
+                'id_tipo_servicio'   => $request->id_tipo_servicio,
                 'fecha_hora_entrada' => now(),
-                'estado' => 'ACTIVO',
-                'foto_entrada' => $fotoEntradaPath,
+                'estado'             => 'ACTIVO',
+                'foto_entrada'       => $fotoEntradaPath,
             ]);
 
-            // 5. Cambiar el estado del Módulo a OCUPADO
-            $modulo = Modulo::find($request->id_modulo);
-            $modulo->update(['estado' => 'OCUPADO']);
+            Modulo::find($request->id_modulo)->update(['estado' => 'OCUPADO']);
         });
 
-        return redirect()->route('parqueadero')->with('success', "Ingreso del vehículo {$placa} registrado correctamente con fotografía de entrada.");
+        return redirect()->route('parqueadero')->with('success', "Ingreso del vehículo {$placa} registrado correctamente.");
     }
 
     public function registrarSalida(Request $request)
     {
         $request->validate([
-            'id_entrada'  => 'required|exists:entrada,id_entrada',
-            'metodo_pago' => 'required|string|in:EFECTIVO,TARJETA,TRANSFERENCIA',
+            'id_entrada'          => 'required|exists:entrada,id_entrada',
+            'metodo_pago'         => 'required|string|in:EFECTIVO,TARJETA,TRANSFERENCIA',
             'foto_base64_salida'  => 'nullable|string',
             'foto_archivo_salida' => 'nullable|image|max:5120',
         ]);
@@ -201,69 +277,114 @@ class ParqueaderoController extends Controller
             return redirect()->back()->withErrors(['error' => 'El ingreso seleccionado ya se encuentra finalizado.']);
         }
 
-        $fechaSalida = now();
-        $horasTranscurridas = ceil(max(1, $fechaSalida->diffInMinutes($entrada->fecha_hora_entrada) / 60));
-        $tarifaHora = $entrada->tipoServicio ? $entrada->tipoServicio->tarifa : 2.00;
-        $montoTotal = $horasTranscurridas * $tarifaHora;
+        $fechaSalida      = now();
+        $minutos          = max(1, $fechaSalida->diffInMinutes($entrada->fecha_hora_entrada));
+        $horasTranscurridas = ceil($minutos / 60);
+        $tarifaHora       = $entrada->tipoServicio ? $entrada->tipoServicio->tarifa : 2.00;
+        $montoTotal       = $horasTranscurridas * $tarifaHora;
 
-        // Procesar foto de salida
-        $fotoSalidaPath = null;
-        $placa = $entrada->placa;
-
-        if ($request->filled('foto_base64_salida')) {
-            try {
-                $imgData = $request->foto_base64_salida;
-                $imgData = str_replace(['data:image/jpeg;base64,', 'data:image/png;base64,'], '', $imgData);
-                $imgData = str_replace(' ', '+', $imgData);
-                $data = base64_decode($imgData);
-
-                $filename = 'salida_' . preg_replace('/[^A-Za-z0-9]/', '', $placa) . '_' . time() . '.jpg';
-                $directory = public_path('uploads/salidas');
-                if (!file_exists($directory)) {
-                    mkdir($directory, 0755, true);
-                }
-                file_put_contents($directory . '/' . $filename, $data);
-                $fotoSalidaPath = 'uploads/salidas/' . $filename;
-            } catch (\Exception $e) {
-                $fotoSalidaPath = null;
-            }
-        } elseif ($request->hasFile('foto_archivo_salida')) {
-            $file = $request->file('foto_archivo_salida');
-            $filename = 'salida_' . preg_replace('/[^A-Za-z0-9]/', '', $placa) . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $directory = public_path('uploads/salidas');
-            if (!file_exists($directory)) {
-                mkdir($directory, 0755, true);
-            }
-            $file->move($directory, $filename);
-            $fotoSalidaPath = 'uploads/salidas/' . $filename;
-        }
+        $placa           = $entrada->placa;
+        $fotoSalidaPath  = $this->procesarFoto($request, 'foto_base64_salida', 'foto_archivo_salida', 'salidas', $placa);
 
         DB::transaction(function () use ($entrada, $fechaSalida, $montoTotal, $request, $fotoSalidaPath) {
-            // 1. Registrar Salida con foto
             $salida = Salida::create([
-                'id_entrada'       => $entrada->id_entrada,
+                'id_entrada'        => $entrada->id_entrada,
                 'fecha_hora_salida' => $fechaSalida,
-                'foto_salida'      => $fotoSalidaPath,
+                'foto_salida'       => $fotoSalidaPath,
             ]);
 
-            // 2. Generar Factura
             Factura::create([
-                'id_salida'    => $salida->id_salida,
+                'id_salida'     => $salida->id_salida,
                 'fecha_emision' => $fechaSalida,
-                'monto_total'  => $montoTotal,
-                'metodo_pago'  => $request->metodo_pago,
-                'estado_pago'  => 'PAGADO',
+                'monto_total'   => $montoTotal,
+                'metodo_pago'   => $request->metodo_pago,
+                'estado_pago'   => 'PAGADO',
             ]);
 
-            // 3. Actualizar estado de Entrada a FINALIZADO
             $entrada->update(['estado' => 'FINALIZADO']);
 
-            // 4. Liberar el Módulo (DISPONIBLE)
             if ($entrada->modulo) {
                 $entrada->modulo->update(['estado' => 'DISPONIBLE']);
             }
         });
 
-        return redirect()->route('parqueadero')->with('success', "Salida procesada con éxito. Factura de $" . number_format($montoTotal, 2) . " generada y Módulo liberado.");
+        return redirect()->route('parqueadero')->with('success', "Salida procesada. Factura de \$" . number_format($montoTotal, 2) . " generada y módulo liberado.");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  OCR de Placa
+    // ─────────────────────────────────────────────────────────────────────────
+    public function procesarFotoOCR(Request $request)
+    {
+        $request->validate(['foto' => 'required|string']);
+
+        $ocrService     = new PlacaOCRService();
+        $placaDetectada = $ocrService->extraerPlacaDesdeImagen($request->foto);
+
+        if (!$placaDetectada) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo detectar la placa en la imagen. Intenta nuevamente o ingresa la placa manualmente.'
+            ], 400);
+        }
+
+        $vehiculo = Vehiculo::with(['cliente.user'])->find($placaDetectada);
+
+        if ($vehiculo) {
+            return response()->json([
+                'success'        => true,
+                'placa'          => $placaDetectada,
+                'vehiculo_existe' => true,
+                'vehiculo'       => [
+                    'placa'       => $vehiculo->placa,
+                    'marca'       => $vehiculo->marca,
+                    'modelo'      => $vehiculo->modelo,
+                    'propietario' => $vehiculo->cliente->user->nombre ?? 'Cliente General',
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'success'        => true,
+            'placa'          => $placaDetectada,
+            'vehiculo_existe' => false,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Helpers privados
+    // ─────────────────────────────────────────────────────────────────────────
+    private function procesarFoto(Request $request, string $base64Field, string $fileField, string $carpeta, string $placa): ?string
+    {
+        $prefix    = ($carpeta === 'entradas') ? 'entrada' : 'salida';
+        $directory = public_path("uploads/{$carpeta}");
+
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        if ($request->filled($base64Field)) {
+            try {
+                $imgData = $request->input($base64Field);
+                $imgData = preg_replace('/^data:image\/[a-z]+;base64,/', '', $imgData);
+                $imgData = str_replace(' ', '+', $imgData);
+                $data    = base64_decode($imgData);
+
+                $filename = "{$prefix}_" . preg_replace('/[^A-Za-z0-9]/', '', $placa) . '_' . time() . '.jpg';
+                file_put_contents("{$directory}/{$filename}", $data);
+                return "uploads/{$carpeta}/{$filename}";
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
+        if ($request->hasFile($fileField)) {
+            $file     = $request->file($fileField);
+            $filename = "{$prefix}_" . preg_replace('/[^A-Za-z0-9]/', '', $placa) . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->move($directory, $filename);
+            return "uploads/{$carpeta}/{$filename}";
+        }
+
+        return null;
     }
 }

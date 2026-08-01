@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Cliente extends Model
 {
+    // Este modelo representa al cliente propietario del vehículo.
+    // Se registra desde el módulo de Vehículos, junto con el vehículo asociado.
     protected $table = 'cliente';
     protected $primaryKey = 'id_cliente';
 

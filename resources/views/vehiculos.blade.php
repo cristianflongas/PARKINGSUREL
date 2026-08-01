@@ -67,7 +67,7 @@
                             <td><span class="badge bg-dark">{{ $v->color ?? 'Sedan' }}</span></td>
                             <td>
                                 @if($estaAdentro)
-                                    <span class="badge bg-success">Adentro (Plaza {{ $ultimoIngreso->modulo->ubicacion ?? 'N/A' }})</span>
+                                    <span class="badge bg-success">Adentro (Módulo {{ $ultimoIngreso->modulo->ubicacion ?? 'N/A' }})</span>
                                 @else
                                     <span class="badge bg-warning">Afuera</span>
                                 @endif
@@ -114,8 +114,20 @@
                             <input type="text" name="placa" class="form-control" placeholder="Ej: ABC-123" required style="text-transform: uppercase;">
                         </div>
                         <div class="mb-3">
+                            <label class="form-label">Cédula del Propietario</label>
+                            <input type="text" name="cedula" class="form-control" placeholder="Ej: 1712345678" required>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">Nombre del Propietario</label>
                             <input type="text" name="propietario" class="form-control" placeholder="Nombre completo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Teléfono</label>
+                            <input type="text" name="telefono" class="form-control" placeholder="Ej: 0987654321">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Correo</label>
+                            <input type="email" name="correo" class="form-control" placeholder="cliente@correo.com">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Marca y Modelo</label>

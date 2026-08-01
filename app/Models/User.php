@@ -39,10 +39,30 @@ class User extends Authenticatable
         ];
     }
 
-    // Relación con Personal
+    // users guarda la identidad base de ambas categorías:
+    // - personal del parqueadero (creado desde módulo Usuarios)
+    // - clientes/propietarios (creado desde módulo Vehículos)
+    // Cada perfil tiene su registro específico en personal o cliente.
     public function personal()
     {
         return $this->hasOne(Personal::class, 'cedula_users', 'cedula');
+    }
+
+    public function cliente()
+    {
+        return $this->hasOne(Cliente::class, 'cedula_users', 'cedula');
+    }
+
+    public function vehiculos()
+    {
+        return $this->hasManyThrough(
+            Vehiculo::class,
+            Cliente::class,
+            'cedula_users',
+            'id_cliente',
+            'cedula',
+            'id_cliente'
+        );
     }
 
     // Relación con Rol a través de Personal

@@ -28,6 +28,18 @@ class Vehiculo extends Model
         return $this->belongsTo(Cliente::class, 'id_cliente', 'id_cliente');
     }
 
+    public function propietario()
+    {
+        return $this->hasOneThrough(
+            User::class,
+            Cliente::class,
+            'id_cliente',
+            'cedula',
+            'id_cliente',
+            'cedula_users'
+        );
+    }
+
     // Relación con entradas
     public function entradas()
     {
