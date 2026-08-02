@@ -14,6 +14,7 @@ use App\Models\Vehiculo;
 use App\Services\PlacaOCRService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -54,12 +55,14 @@ class ParqueaderoController extends Controller
             ->orderBy('placa')
             ->get()
             ->map(function ($v) {
+                $user = $v->cliente?->user;
+
                 return [
                     'placa'       => $v->placa,
                     'marca'       => $v->marca ?? '',
                     'modelo'      => $v->modelo ?? '',
-                    'cedula'      => $v->cliente->user->cedula ?? '',
-                    'propietario' => $v->cliente->user->nombre ?? 'Cliente General',
+                    'cedula'      => $user?->cedula ?? '',
+                    'propietario' => $user?->nombre ?? 'Cliente General',
                 ];
             });
 
@@ -199,7 +202,7 @@ class ParqueaderoController extends Controller
         $fotoEntradaPath = $this->procesarFoto($request, 'foto_base64', 'foto_archivo', 'entradas', $placa);
 
         DB::transaction(function () use ($request, $placa, $fotoEntradaPath) {
-            $userAuth = auth()->user();
+            $userAuth = Auth::user();
 
             $cliente = null;
             if ($request->filled('cedula')) {
@@ -242,7 +245,7 @@ class ParqueaderoController extends Controller
                 ]);
             }
 
-            $idBuscado = $userAuth->id_personal ?? $userAuth->cedula ?? $userAuth->id;
+            $idBuscado = $userAuth?->id_personal ?? $userAuth?->cedula ?? $userAuth?->id ?? 1;
             $personal  = Personal::find($idBuscado);
             $idPersonal = $personal ? $personal->id_personal : 1;
 

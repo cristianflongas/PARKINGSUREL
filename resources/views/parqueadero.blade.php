@@ -20,21 +20,21 @@
 {{-- ── Tarjetas KPI ────────────────────────────────────────────────────── --}}
 <div class="row mb-4 g-3">
     <div class="col-md-4">
-        <div class="kpi-card h-100">
+        <div class="kpi-card">
             <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
             <div class="kpi-value">{{ $disponibles }}</div>
             <div class="kpi-label">Módulos Disponibles</div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="kpi-card h-100">
+        <div class="kpi-card">
             <div class="kpi-icon"><i class="fas fa-car"></i></div>
             <div class="kpi-value">{{ $ocupados }}</div>
             <div class="kpi-label">Módulos Ocupados</div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="kpi-card h-100">
+        <div class="kpi-card">
             <div class="kpi-icon"><i class="fas fa-tools"></i></div>
             <div class="kpi-value">{{ $mantenimiento }}</div>
             <div class="kpi-label">En Mantenimiento</div>
@@ -70,10 +70,10 @@
                         data-entrada-id="{{ $entrada->id_entrada }}"
                         data-placa="{{ $entrada->placa }}"
                         data-ubicacion="{{ $modulo->ubicacion }}"
-                        data-propietario="{{ $entrada->vehiculo->cliente->user->nombre ?? 'Cliente General' }}"
-                        data-tarifa="{{ $entrada->tipoServicio->tarifa ?? 2.00 }}"
-                        data-servicio="{{ $entrada->tipoServicio->nombre_tipo_servicio ?? 'Tarifa Estándar' }}"
-                        data-hora="{{ \Carbon\Carbon::parse($entrada->fecha_hora_entrada)->format('h:i A - d/m/Y') }}"
+                        data-propietario="{{ $entrada->vehiculo?->cliente?->user?->nombre ?? 'Cliente General' }}"
+                        data-tarifa="{{ $entrada->tipoServicio?->tarifa ?? 2.00 }}"
+                        data-servicio="{{ $entrada->tipoServicio?->nombre_tipo_servicio ?? 'Tarifa Estándar' }}"
+                        data-hora="{{ $entrada->fecha_hora_entrada ? \Carbon\Carbon::parse($entrada->fecha_hora_entrada)->format('h:i A - d/m/Y') : '--' }}"
                         data-foto="{{ $entrada->foto_entrada ? asset($entrada->foto_entrada) : '' }}"
                         onclick="abrirModalSalida(this)"
                         title="Ocupado — clic para registrar salida"

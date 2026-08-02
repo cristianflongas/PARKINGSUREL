@@ -429,11 +429,27 @@ body {
     background: #ffffff;
     border: 1px solid var(--border-color);
     transition: all 0.25s ease;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
 }
 
 .kpi-card:hover {
     border-color: var(--primary-color);
     box-shadow: 0 12px 28px rgba(255, 215, 0, 0.15);
+}
+
+.kpi-card.disponible {
+    background: linear-gradient(180deg, #edf9f0 0%, #e2f3e7 100%);
+    border-color: rgba(46, 139, 87, 0.18);
+}
+
+.kpi-card.ocupado {
+    background: linear-gradient(180deg, #fff1f1 0%, #f9d9d9 100%);
+    border-color: rgba(154, 45, 45, 0.18);
+}
+
+.kpi-card.mantenimiento {
+    background: linear-gradient(180deg, #fffaf0 0%, #f9efd2 100%);
+    border-color: rgba(122, 91, 6, 0.18);
 }
 
 .kpi-icon {
@@ -450,6 +466,18 @@ body {
     box-shadow: 0 6px 16px rgba(10, 10, 10, 0.15);
 }
 
+.kpi-card.disponible .kpi-icon {
+    color: var(--success-strong);
+}
+
+.kpi-card.ocupado .kpi-icon {
+    color: var(--danger-strong);
+}
+
+.kpi-card.mantenimiento .kpi-icon {
+    color: var(--warning-strong);
+}
+
 .kpi-value {
     font-size: 2.2rem;
     font-weight: 900;
@@ -457,6 +485,21 @@ body {
     line-height: 1;
     margin-bottom: 6px;
     color: var(--dark-bg);
+}
+
+.kpi-card.disponible .kpi-value,
+.kpi-card.disponible .kpi-label {
+    color: var(--success-strong);
+}
+
+.kpi-card.ocupado .kpi-value,
+.kpi-card.ocupado .kpi-label {
+    color: var(--danger-strong);
+}
+
+.kpi-card.mantenimiento .kpi-value,
+.kpi-card.mantenimiento .kpi-label {
+    color: var(--warning-strong);
 }
 
 .kpi-label {

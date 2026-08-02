@@ -40,7 +40,7 @@ return [
     'guards' => [
         'web' => [
             'driver' => 'session',
-            'provider' => 'users',
+            'provider' => 'personal',
         ],
     ],
 
@@ -62,9 +62,13 @@ return [
     */
 
     'providers' => [
-        'users' => [
+        'personal' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Personal::class, // Cambiado aquí
+            'model' => App\Models\Personal::class,
+        ],
+        'reset_users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
         ],
     ],
 
@@ -95,7 +99,7 @@ return [
 
     'passwords'=> [
         'users' => [
-            'provider' => 'users',
+            'provider' => 'reset_users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,

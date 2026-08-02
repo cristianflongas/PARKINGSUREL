@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +15,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, CanResetPassword;
 
     protected $primaryKey = 'cedula';
     public $incrementing = false;
@@ -63,6 +65,26 @@ class User extends Authenticatable
             'cedula',
             'id_cliente'
         );
+    }
+
+    public function getEmailForPasswordReset(): string
+    {
+        return $this->correo ?? '';
+    }
+
+    public function getEmailAttribute(): ?string
+    {
+        return $this->correo;
+    }
+
+    public function setEmailAttribute($value): void
+    {
+        $this->attributes['correo'] = $value;
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPassword($token));
     }
 
     // Relación con Rol a través de Personal
