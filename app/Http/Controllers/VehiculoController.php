@@ -153,4 +153,74 @@ class VehiculoController extends Controller
 
         return redirect()->route('vehiculos')->with('success', "Vehículo {$placa} eliminado del registro.");
     }
+
+    /**
+     * API: Obtener información de un vehículo específico
+     */
+    public function obtenerVehiculo($placa)
+    {
+        $vehiculo = Vehiculo::with(['cliente.user', 'entradas' => function ($q) {
+            $q->where('estado', 'ACTIVO')->first();
+        }])->find($placa);
+
+        if (!$vehiculo) {
+            return response()->json(['error' => 'Vehículo no encontrado'], 404);
+        }
+
+        return response()->json([
+            'placa' => $vehiculo->placa,
+            'marca' => $vehiculo->marca,
+            'modelo' => $vehiculo->modelo,
+            'color' => $vehiculo->color,
+            'propietario' => [
+                'nombre' => $vehiculo->cliente->user->nombre ?? 'Cliente General',
+                'cedula' => $vehiculo->cliente->user->cedula ?? '',
+                'telefono' => $vehiculo->cliente->user->telefono ?? '',
+                'correo' => $vehiculo->cliente->user->correo ?? ''
+            ],
+            'esta_adentro' => $vehiculo->entradas()->where('estado', 'ACTIVO')->exists()
+        ]);
+    }
+
+    /**
+     * API: Listar vehículos para select/autocomplete
+     */
+    public function listarVehiculos(Request $request)
+    {
+        $query = Vehiculo::with(['cliente.user'])
+            ->select('placa', 'marca', 'modelo', 'color', 'id_cliente');
+
+        // Filtrar solo vehículos que estén afuera para registro de entrada
+        if ($request->get('solo_afuera')) {
+            $query->whereDoesntHave('entradas', function ($q) {
+                $q->where('estado', 'ACTIVO');
+            });
+        }
+
+        // Filtrar solo vehículos que estén adentro para registro de salida
+        if ($request->get('solo_adentro')) {
+            $query->whereHas('entradas', function ($q) {
+                $q->where('estado', 'ACTIVO');
+            });
+        }
+
+        // Buscar por placa
+        if ($request->filled('buscar')) {
+            $query->where('placa', 'LIKE', '%' . $request->buscar . '%');
+        }
+
+        $vehiculos = $query->get()->map(function ($vehiculo) {
+            $nombrePropietario = $vehiculo->cliente->user->nombre ?? 'Cliente General';
+            return [
+                'placa' => $vehiculo->placa,
+                'marca' => $vehiculo->marca,
+                'modelo' => $vehiculo->modelo,
+                'color' => $vehiculo->color,
+                'propietario' => $nombrePropietario,
+                'display' => "{$vehiculo->placa} - {$vehiculo->marca} {$vehiculo->modelo} ({$nombrePropietario})"
+            ];
+        });
+
+        return response()->json($vehiculos);
+    }
 }

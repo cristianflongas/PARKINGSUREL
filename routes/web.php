@@ -38,6 +38,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/vehiculos/{placa}', [VehiculoController::class, 'update'])->name('vehiculos.update');
     Route::delete('/vehiculos/{placa}', [VehiculoController::class, 'destroy'])->name('vehiculos.destroy');
 
+    // API endpoint para obtener información de vehículos (AJAX)
+    Route::get('/api/vehiculos/{placa}', [VehiculoController::class, 'obtenerVehiculo'])->name('api.vehiculos.obtener');
+    Route::get('/api/vehiculos', [VehiculoController::class, 'listarVehiculos'])->name('api.vehiculos.listar');
+
     // Gestión de Pagos y Comprobantes
     Route::get('/pagos', [PagoController::class, 'index'])->name('pagos');
     Route::post('/pagos/procesar', [PagoController::class, 'procesarPago'])->name('pagos.procesar');
@@ -50,6 +54,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/reportes/{id}/pdf', [ReporteController::class, 'descargarPDF'])->name('reportes.pdf');
     Route::get('/reportes/{id}/excel', [ReporteController::class, 'descargarExcel'])->name('reportes.excel');
     Route::delete('/reportes/{id}', [ReporteController::class, 'destroy'])->name('reportes.destroy');
+    Route::get('/reportes/test-consultas', [ReporteController::class, 'test'])->name('reportes.test');
 
     // Rutas protegidas solo para ADMINISTRADOR
     Route::middleware('role:Administrador')->group(function () {

@@ -55,37 +55,82 @@
         @endif
     </div>
 
-    <!-- Tabla de Últimas Entradas -->
+    <!-- Tablas de Actividad Reciente -->
     <div class="row mt-2">
-        <div class="col-12">
+        <!-- Últimas Entradas (Vehículos Actualmente Estacionados) -->
+        <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-history me-2"></i> Últimos Ingresos Registrados</h5>
+                    <h5 class="mb-0"><i class="fas fa-sign-in-alt me-2 text-success"></i> Vehículos Estacionados</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle">
+                        <table class="table table-hover align-middle table-sm">
                             <thead>
                                 <tr>
                                     <th>Placa</th>
                                     <th>Propietario</th>
-                                    <th>Hora y Fecha de Entrada</th>
+                                    <th>Entrada</th>
                                     <th>Módulo</th>
-                                    <th>Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($ultimosIngresos as $ingreso)
                                 <tr>
                                     <td><strong class="text-dark">{{ $ingreso->placa }}</strong></td>
-                                    <td>{{ $ingreso->vehiculo->cliente->user->nombre ?? 'Cliente General' }}</td>
-                                    <td>{{ \Carbon\Carbon::parse($ingreso->fecha_hora_entrada)->format('h:i A - d/m/Y') }}</td>
-                                    <td><span class="badge bg-warning">Módulo {{ $ingreso->modulo->ubicacion ?? 'N/A' }}</span></td>
-                                    <td><span class="badge bg-success">{{ $ingreso->estado }}</span></td>
+                                    <td class="small">{{ $ingreso->vehiculo->cliente->user->nombre ?? 'Cliente General' }}</td>
+                                    <td class="small">{{ \Carbon\Carbon::parse($ingreso->fecha_hora_entrada)->format('H:i') }}</td>
+                                    <td><span class="badge bg-success badge-sm">{{ $ingreso->modulo->ubicacion ?? 'N/A' }}</span></td>
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">No hay vehículos estacionados en este momento.</td>
+                                    <td colspan="4" class="text-center py-3 text-muted small">No hay vehículos estacionados</td>
+                                </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Últimos Servicios Completados -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-check-circle me-2 text-primary"></i> Últimos Servicios Completados</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Placa</th>
+                                    <th>Cliente</th>
+                                    <th>Servicio</th>
+                                    <th>Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($ultimosServicios as $servicio)
+                                @php
+                                    $factura = $servicio->salida?->factura;
+                                @endphp
+                                <tr>
+                                    <td><strong class="text-dark">{{ $servicio->placa }}</strong></td>
+                                    <td class="small">{{ $servicio->vehiculo->cliente->user->nombre ?? 'Cliente General' }}</td>
+                                    <td><span class="badge bg-info badge-sm">{{ $servicio->tipoServicio->nombre_tipo_servicio ?? 'N/A' }}</span></td>
+                                    <td class="small">
+                                        @if($factura)
+                                            <strong class="text-success">${{ number_format($factura->monto_total, 2) }}</strong>
+                                        @else
+                                            <span class="text-muted">Pendiente</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr>
+                                    <td colspan="4" class="text-center py-3 text-muted small">No hay servicios recientes</td>
                                 </tr>
                                 @endforelse
                             </tbody>

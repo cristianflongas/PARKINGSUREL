@@ -32,6 +32,13 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        // 6. Últimos Servicios Completados (Nuevos)
+        $ultimosServicios = Entrada::with(['vehiculo.cliente.user', 'modulo', 'tipoServicio', 'salida.factura'])
+            ->whereHas('salida')
+            ->orderBy('updated_at', 'desc')
+            ->take(8)
+            ->get();
+
         return view('dashboard', [
             'active' => 'dashboard',
             'disponibles' => $disponibles,
@@ -39,6 +46,7 @@ class DashboardController extends Controller
             'ingresosHoy' => $ingresosHoy,
             'personalActivo' => $personalActivo,
             'ultimosIngresos' => $ultimosIngresos,
+            'ultimosServicios' => $ultimosServicios,
         ]);
     }
 }
